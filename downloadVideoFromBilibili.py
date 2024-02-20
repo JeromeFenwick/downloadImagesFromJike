@@ -35,10 +35,10 @@ def get_playinfo(video_id, cookies):
         return None, None
 
 
-def download_file(file_url, file_type, title, cookies, max_retries=3):
+def download_file(file_urls, file_type, title, cookies, max_retries=3):
     headers = set_request_headers()
 
-    for attempt in range(1, max_retries + 1):
+    for file_url in file_urls:
         try:
             resp = requests.get(url=file_url, headers=headers, cookies=cookies, stream=True)
             resp.raise_for_status()
@@ -62,16 +62,13 @@ def download_file(file_url, file_type, title, cookies, max_retries=3):
                 cost_time = end_time - start_time
                 # print(f'\n累计耗时：{cost_time:0.2f} 秒')
                 # print(f'下载速度：{file_size / cost_time:0.2f} B/s')
-                break  # Exit the loop if download is successful
+                return  # Exit the loop if download is successful
             else:
                 print(f"文件下载失败。状态码: {resp.status_code}")
         except requests.RequestException as e:
             print(f"文件下载失败: {e}")
-            if attempt < max_retries:
-                print(f"重试下载，尝试次数: {attempt + 1}")
-                time.sleep(2)  # Add a short delay before retrying
-            else:
-                print(f"达到最大重试次数 ({max_retries})，放弃下载。")
+    # 如果所有链接都尝试过了仍然失败，则输出相应的提示
+    print(f"所有链接均下载失败。")
 
 
 def organize_videos_by_quality(videos, accept_qualities, accept_description):
@@ -86,7 +83,8 @@ def organize_videos_by_quality(videos, accept_qualities, accept_description):
             'resolution': f"{video['width']}x{video['height']}",
             'frame_rate': video.get('frame_rate', 'Unknown Frame Rate'),
             'codecs': video.get('codecs', 'Unknown Codecs'),
-            'video_url': video['base_url']
+            'video_url': video['base_url'],
+            'backup_url': video.get('backup_url', None)
         })
 
     return quality_dict
@@ -190,10 +188,11 @@ def download_videos(selected_quality, resp, playinfo_data, video_quality_index, 
 
     def download_single_video(index, video_info):
         global downloaded_file_names
-        video_url = video_info['video_url']
+        video_urls = [video_info['video_url']]
+        video_urls.extend(video_info['backup_url'])
         v_title_index = extract_title(resp.text, playinfo_data, video_quality_index) + f"_{index}"
         downloaded_file_names.append(f"{v_title_index}.mp4")
-        download_file(video_url, 'mp4', v_title_index, cookies)
+        download_file(video_urls, 'mp4', v_title_index, cookies)
 
     choice = input_with_timeout("请输入要下载的视频序号（输入回车跳过，默认为2）：", 3, '2')
 
@@ -255,8 +254,9 @@ def main():
         download_videos(selected_quality, resp, playinfo_data, video_quality_index, cookies)
 
         a_title = extract_title(resp.text, playinfo_data, video_quality_index)
-        audio_url = playinfo_data['data']['dash']['audio'][0]['base_url']
-        download_file(audio_url, 'mp3', a_title, cookies)
+        audio_urls = [playinfo_data['data']['dash']['audio'][0]['base_url']]
+        audio_urls.extend(playinfo_data['data']['dash']['audio'][0]['backup_url'])
+        download_file(audio_urls, 'mp3', a_title, cookies)
 
         choose_best_video(v_title)
         combine_video_and_audio(f"{v_title}.mp4", f"{a_title}.mp3", f"{v_title}——合成.mp4")
