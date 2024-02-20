@@ -242,7 +242,7 @@ def combine_video_and_audio(video_path, audio_path, output_path):
 def main():
     url = input("Enter the Bilibili video URL: ")
     cookies = {
-        "SESSDATA": "cf22fb7d%2C1723636963%2Ce5744*21",
+        "SESSDATA": "",
     }
 
     video_id = extract_video_id(url)
